@@ -1,0 +1,3 @@
+displayName = Times New Bastard
+author = Tomat
+version = 0.1
