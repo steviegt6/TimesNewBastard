@@ -1,3 +1,5 @@
 displayName = Times New Bastard
 author = Tomat
-version = 0.1
+version = 1.0.0
+modReferences = TomatoLib
+sortAfter = TomatoLib
