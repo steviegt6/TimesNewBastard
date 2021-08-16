@@ -1,5 +1,4 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Xna.Framework;
@@ -7,7 +6,6 @@ using Microsoft.Xna.Framework.Graphics;
 using ReLogic.Content;
 using ReLogic.Graphics;
 using ReLogic.Text;
-using Terraria;
 using Terraria.GameContent;
 using Terraria.ModLoader;
 using TomatoLib;
@@ -27,32 +25,33 @@ namespace TimesNewBastard
         public BastardDynamicSpriteFont BastardMouseFont;
         public BastardDynamicSpriteFont BastardDeathFont;
 
+        public delegate void BastardIHateYouA(DynamicSpriteFont self, string text, SpriteBatch spriteBatch,
+            Vector2 startPosition, Color color, float rotation, Vector2 origin, ref Vector2 scale,
+            SpriteEffects spriteEffects, float depth);
+
         public override void Load()
         {
             base.Load();
-            
-            Main.QueueMainThreadAction(() =>
-            {
-                Type type = typeof(BastardDynamicSpriteFont);
 
-                this.CreateDetour(type.GetCachedMethod("SetPages"),
-                    GetType().GetCachedMethod(nameof(SetPagesOverride)));
+            Type type = typeof(BastardDynamicSpriteFont);
 
-                this.CreateDetour(type.GetCachedMethod("IsCharacterSupported"),
-                    GetType().GetCachedMethod(nameof(IsCharacterSupportedOverride)));
+            this.CreateDetour(type.GetCachedMethod("SetPages"),
+                GetType().GetCachedMethod(nameof(SetPagesOverride)));
 
-                this.CreateDetour(type.GetCachedMethod("AreCharactersSupported"),
-                    GetType().GetCachedMethod(nameof(AreCharactersSupportedOverride)));
+            this.CreateDetour(type.GetCachedMethod("IsCharacterSupported"),
+                GetType().GetCachedMethod(nameof(IsCharacterSupportedOverride)));
 
-                this.CreateDetour(type.GetCachedMethod("InternalDraw"),
-                    GetType().GetCachedMethod(nameof(InternalDrawOverride)));
+            this.CreateDetour(type.GetCachedMethod("AreCharactersSupported"),
+                GetType().GetCachedMethod(nameof(AreCharactersSupportedOverride)));
 
-                this.CreateDetour(type.GetCachedMethod("MeasureString"),
-                    GetType().GetCachedMethod(nameof(MeasureStringOverride)));
+            this.CreateDetour(type.GetCachedMethod("InternalDraw"),
+                GetType().GetCachedMethod(nameof(InternalDrawOverride)));
 
-                this.CreateDetour(type.GetCachedMethod("GetCharacterMetrics"),
-                    GetType().GetCachedMethod(nameof(GetCharacterMetricsOverride)));
-            });
+            this.CreateDetour(type.GetCachedMethod("MeasureString"),
+                GetType().GetCachedMethod(nameof(MeasureStringOverride)));
+
+            this.CreateDetour(type.GetCachedMethod("GetCharacterMetrics"),
+                GetType().GetCachedMethod(nameof(GetCharacterMetricsOverride)));
         }
 
         public override void PostSetupContent()
@@ -67,11 +66,11 @@ namespace TimesNewBastard
             MouseFont = FontAssets.MouseText.Value;
             DeathText = FontAssets.DeathText.Value;
 
-            /*BastardMouseFont = new BastardDynamicSpriteFont(TimesNewRomanFont.Value, SansSerifFont.Value);
+            BastardMouseFont = new BastardDynamicSpriteFont(TimesNewRomanFont.Value, SansSerifFont.Value);
             BastardDeathFont = new BastardDynamicSpriteFont(TimesNewRomanFontLarge.Value, SansSerifFontLarge.Value);
 
             FontAssets.MouseText.SetFieldValue("ownValue", BastardMouseFont);
-            FontAssets.DeathText.SetFieldValue("ownValue", BastardDeathFont);*/
+            FontAssets.DeathText.SetFieldValue("ownValue", BastardDeathFont);
         }
 
         public override void Unload()
@@ -92,14 +91,12 @@ namespace TimesNewBastard
 
         public static bool AreCharactersSupportedOverride(Func<DynamicSpriteFont, IEnumerable<char>, bool> orig, DynamicSpriteFont self, IEnumerable<char> characters) => self is not BastardDynamicSpriteFont bastard ? orig(self, characters) : characters.All(bastard.IsCharacterSupported);
 
-        public static void InternalDrawOverride(
-            Action<DynamicSpriteFont, string, SpriteBatch, Vector2, Color, float, Vector2, Vector2, SpriteEffects,
-                float> orig, DynamicSpriteFont self, string text, SpriteBatch spriteBatch, Vector2 startPosition,
+        public static void InternalDrawOverride(BastardIHateYouA orig, DynamicSpriteFont self, string text, SpriteBatch spriteBatch, Vector2 startPosition,
             Color color, float rotation, Vector2 origin, ref Vector2 scale, SpriteEffects spriteEffects, float depth)
         {
             if (self is not BastardDynamicSpriteFont bastard)
             {
-                orig(self, text, spriteBatch, startPosition, color, rotation, origin, scale, spriteEffects, depth);
+                orig(self, text, spriteBatch, startPosition, color, rotation, origin, ref scale, spriteEffects, depth);
                 return;
             }
 
@@ -143,46 +140,44 @@ namespace TimesNewBastard
 
                     case '\r':
                         continue;
-
-                    default:
-                        bastard.Index++;
-
-                        BastardCharacterData characterData = !bastard.SpriteCharacters.ContainsKey(character)
-                            ? bastard.DefaultCharacterData
-                            : bastard.SpriteCharacters[character];
-
-                        characterData = BastardCharacterData.WithIndex(characterData, bastard.Index);
-
-                        Vector3 kerning = characterData.Kerning;
-                        Rectangle padding = characterData.Padding;
-
-                        if (spriteEffects.HasFlag(SpriteEffects.FlipHorizontally))
-                            padding.X -= padding.Width;
-
-                        if (spriteEffects.HasFlag(SpriteEffects.FlipVertically))
-                            padding.Y = bastard.LineSpacing - characterData.Glyph.Height - padding.Y;
-
-                        if (newLine)
-                            kerning.X = Math.Max(kerning.X, 0.0f);
-                        else
-                            size.X += bastard.CharacterSpacing * scale.X * direction.X;
-
-                        size.X += kerning.X * scale.X * direction.X;
-                        Vector2 result = size;
-
-                        result.X += padding.X * scale.X;
-                        result.Y += padding.Y * scale.Y;
-
-                        Vector2.Transform(ref result, ref matrix, out result);
-                        result += startPosition;
-
-                        spriteBatch.Draw(characterData.Texture, result, characterData.Glyph, color, rotation,
-                            Vector2.Zero, scale, spriteEffects, depth);
-
-                        size.X += (kerning.Y + kerning.Z) * scale.X * direction.X;
-                        newLine = false;
-                        continue;
                 }
+
+                bastard.Index++;
+
+                BastardCharacterData characterData = !bastard.SpriteCharacters.ContainsKey(character)
+                    ? bastard.DefaultCharacterData
+                    : bastard.SpriteCharacters[character];
+
+                characterData = BastardCharacterData.WithIndex(characterData, bastard.Index);
+
+                Vector3 kerning = characterData.Kerning;
+                Rectangle padding = characterData.Padding;
+
+                if (spriteEffects.HasFlag(SpriteEffects.FlipHorizontally))
+                    padding.X -= padding.Width;
+
+                if (spriteEffects.HasFlag(SpriteEffects.FlipVertically))
+                    padding.Y = bastard.LineSpacing - characterData.Glyph.Height - padding.Y;
+
+                if (newLine)
+                    kerning.X = Math.Max(kerning.X, 0.0f);
+                else
+                    size.X += bastard.CharacterSpacing * scale.X * direction.X;
+
+                size.X += kerning.X * scale.X * direction.X;
+                Vector2 result = size;
+
+                result.X += padding.X * scale.X;
+                result.Y += padding.Y * scale.Y;
+
+                Vector2.Transform(ref result, ref matrix, out result);
+                result += startPosition;
+
+                spriteBatch.Draw(characterData.Texture, result, characterData.Glyph, color, rotation,
+                    Vector2.Zero, scale, spriteEffects, depth);
+
+                size.X += (kerning.Y + kerning.Z) * scale.X * direction.X;
+                newLine = false;
             }
         }
 
@@ -270,118 +265,6 @@ namespace TimesNewBastard
                 : bastard.SpriteCharacters[character];
 
             return data.ToGlyphMetric();
-        }
-    }
-
-    public readonly struct BastardCharacterData
-    {
-        private readonly (Texture2D, Texture2D) Textures;
-        private readonly (Rectangle, Rectangle) Glyphs;
-        private readonly (Rectangle, Rectangle) Paddings;
-        private readonly (Vector3, Vector3) Kernings;
-
-        public int Index { get; }
-
-        public Texture2D Texture => GetBastard(Textures);
-
-        public Rectangle Glyph => GetBastard(Glyphs);
-
-        public Rectangle Padding => GetBastard(Paddings);
-
-        public Vector3 Kerning => GetBastard(Kernings);
-
-        public bool IsBastardized() => Index % 7 == 0;
-
-        public T GetBastard<T>((T, T) tuple) => IsBastardized() ? tuple.Item2 : tuple.Item1;
-
-        public BastardCharacterData((Texture2D, Texture2D) textures, (Rectangle, Rectangle) glyphs,
-            (Rectangle, Rectangle) paddings, (Vector3, Vector3) kernings, int index = 0)
-        {
-            Textures = textures;
-            Glyphs = glyphs;
-            Paddings = paddings;
-            Kernings = kernings;
-            Index = index;
-        }
-
-        public GlyphMetrics ToGlyphMetric()
-        {
-            float kerningX = Math.Max(Kernings.Item1.X, Kernings.Item2.X);
-            float kerningY = Math.Max(Kernings.Item2.Y, Kernings.Item2.Y);
-            float kerningZ = Math.Max(Kernings.Item2.Z, Kernings.Item2.Z);
-
-            return GlyphMetrics.FromKerningData(kerningX, kerningY, kerningZ);
-        }
-
-        public static BastardCharacterData WithIndex(BastardCharacterData data, int index) =>
-            new(data.Textures, data.Glyphs, data.Paddings, data.Kernings, index);
-
-        public static BastardCharacterData FromObjects(object dataOne, object dataTwo)
-        {
-            Type type = typeof(DynamicSpriteFont).GetCachedNestedType("SpriteCharacterData");
-
-            (Texture2D, Texture2D) textures = new();
-            (Rectangle, Rectangle) glyphs = new();
-            (Rectangle, Rectangle) paddings = new();
-            (Vector3, Vector3) kernings = new();
-
-            textures.Item1 = type.GetCachedField("Texture").GetValue<Texture2D>(dataOne);
-            glyphs.Item1 = type.GetCachedField("Glyph").GetValue<Rectangle>(dataOne);
-            paddings.Item1 = type.GetCachedField("Padding").GetValue<Rectangle>(dataOne);
-            kernings.Item1 = type.GetCachedField("Kerning").GetValue<Vector3>(dataOne);
-
-            textures.Item2 = type.GetCachedField("Texture").GetValue<Texture2D>(dataTwo);
-            glyphs.Item2 = type.GetCachedField("Glyph").GetValue<Rectangle>(dataTwo);
-            paddings.Item2 = type.GetCachedField("Padding").GetValue<Rectangle>(dataTwo);
-            kernings.Item2 = type.GetCachedField("Kerning").GetValue<Vector3>(dataTwo);
-
-            return new BastardCharacterData(textures, glyphs, paddings, kernings);
-        }
-    }
-
-    public class BastardDynamicSpriteFont : DynamicSpriteFont
-    {
-        public DynamicSpriteFont MainSpriteFont { get; }
-
-        public DynamicSpriteFont BastardSpriteFont { get; }
-
-        public Dictionary<char, BastardCharacterData> SpriteCharacters;
-        public BastardCharacterData DefaultCharacterData;
-        public int Index;
-
-        public BastardDynamicSpriteFont(DynamicSpriteFont main, DynamicSpriteFont bastard) :
-            base(Math.Max(main.CharacterSpacing, bastard.CharacterSpacing), 
-            Math.Max(main.LineSpacing, bastard.LineSpacing),
-            main.DefaultCharacter)
-        {
-            MainSpriteFont = main;
-            BastardSpriteFont = bastard;
-
-            SpriteCharacters = new Dictionary<char, BastardCharacterData>();
-
-            static Dictionary<char, object> Dict(IDictionary dictionary)
-            {
-                List<DictionaryEntry> entries = new();
-
-                foreach (DictionaryEntry entry in dictionary)
-                    entries.Add(entry);
-
-                return entries.ToDictionary(x => (char) x.Key, x => x.Value);
-            }
-
-            Dictionary<char, object> mainCharacters = Dict(main.GetFieldValue<DynamicSpriteFont, IDictionary>("_spriteCharacters"));
-            Dictionary<char, object> bastardCharacters = Dict(bastard.GetFieldValue<DynamicSpriteFont, IDictionary>("_spriteCharacters"));
-
-            foreach (char character in mainCharacters.Keys)
-            {
-                object dataOne = mainCharacters[character];
-                object dataTwo = bastardCharacters[character];
-
-                SpriteCharacters[character] = BastardCharacterData.FromObjects(dataOne, dataTwo);
-
-                if (character == DefaultCharacter)
-                    DefaultCharacterData = SpriteCharacters[character];
-            }
         }
     }
 }
