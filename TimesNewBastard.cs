@@ -9,8 +9,7 @@ using ReLogic.Text;
 using Terraria.GameContent;
 using Terraria.ModLoader;
 using TomatoLib;
-using TomatoLib.Core.MonoModding;
-using TomatoLib.Core.Utilities.Extensions;
+using TomatoLib.Common.Utilities.Extensions;
 
 namespace TimesNewBastard
 {

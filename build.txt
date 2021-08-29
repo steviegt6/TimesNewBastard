@@ -1,6 +1,7 @@
 displayName = Times New Bastard
 author = Tomat
-version = 1.0.1
+version = 1.0.3
 modReferences = TomatoLib
 sortAfter = TomatoLib
-buildIgnore = .git/, .vs/, bin/, obj/, TomatoLib/, workshop.json
+buildIgnore = .git/*, .vs/*, bin/*, obj/*, TomatoLib/*, workshop.json
+homepage = https://discord.com/invite/qrZ4Bpz
